@@ -1,263 +1,67 @@
-body {
-    margin: 0;
-    background: #e5f6f8;
-    font-family: 'Montserrat', Arial, sans-serif;
-}
-.khung-chinh {
-    max-width: 1400px;
-    margin: 32px auto 0 auto;
-    background: #fff;
-    border-radius: 36px;
-    box-shadow: 0 8px 38px 0 rgba(0,0,0,0.12);
-    padding-bottom: 44px;
-}
-.phan-dau {
-    padding: 30px 56px 0 56px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-.ten-web {
-    font-size: 2.3rem;
-    font-weight: 700;
-    color: #14b8a6;
-    letter-spacing: 1px;
-}
-.thanh-menu {
-    display: flex;
-    gap: 32px;
-}
-.thanh-menu a {
-    text-decoration: none;
-    color: #333;
-    font-weight: 600;
-    font-size: 1.13rem;
-    padding: 10px 18px;
-    border-radius: 10px;
-    transition: background 0.2s;
-}
-.thanh-menu a:hover {
-    background: #d1fae5;
-    color: #0891b2;
-}
-.nut-nguoi-dung {
-    background: #fde68a;
-    border-radius: 50%;
-    width: 42px;
-    height: 42px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.3rem;
-    color: #d97706;
-    border: none;
-    cursor: pointer;
-}
-.banner {
-    margin: 46px 0 0 0;
-    padding: 0;
-    background: linear-gradient(120deg, #a7f3d0 68%, #60a5fa 100%);
-    border-radius: 26px 26px 0 0;
-    position: relative;
-    min-height: 260px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: row;
-    align-items: stretch;
-    justify-content: flex-start;
-}
-.noi-dung-banner {
-    padding: 54px 56px 54px 56px;
-    z-index: 2;
-    flex: 1 1 0;
-}
-.tieu-de-banner {
-    font-size: 2.7rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin-bottom: 18px;
-    letter-spacing: 0.5px;
-}
-.mo-ta-banner {
-    font-size: 1.15rem;
-    color: #334155;
-    margin-bottom: 32px;
-    line-height: 1.6;
-    opacity: 0.92;
-}
-.cac-nut-banner {
-    display: flex;
-    gap: 24px;
-    margin-top: 6px;
-}
-.cac-nut-banner button {
-    border: none;
-    border-radius: 18px;
-    padding: 16px 40px;
-    font-size: 1.15rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: background 0.18s;
-    box-shadow: 0 2px 18px 0 rgba(0,0,0,0.08);
-}
-.nut-chinh {
-    background: #16a34a;
-    color: #fff;
-}
-.nut-chinh:hover {
-    background: #059669;
-}
-.nut-phu {
-    background: #f1f5f9;
-    color: #2563eb;
-    border: 2px solid #2563eb;
-}
-.nut-phu:hover {
-    background: #dbeafe;
-}
-.banner-anh {
-    flex: 0 0 180px;
-    min-width: 120px;
-    background: url('https://img.freepik.com/free-vector/landscape-background-with-trees_1308-51985.jpg?w=826&t=st=1695798000~exp=1695798600~hmac=2f9c3a1a5e8a27e0d1e89e8e4e7e65b5a2a647f2aec0c837b8bc5e9c12d79dac') no-repeat right bottom/cover;
-    border-radius: 0 26px 0 0;
-    min-height: 180px;
-    opacity: 0.92;
-}
-.sao-nho {
-    position: absolute;
-    width: 18px;
-    height: 18px;
-    background: #fffbe7;
-    border-radius: 50%;
-    box-shadow: 0 0 12px 2px #facc15, 0 0 0 5px #fcd34d70;
-    z-index: 1;
-}
-.sao-nho:nth-child(1) { width: 14px; height: 14px;}
-.sao-nho:nth-child(2) { width: 10px; height: 10px;}
-.sao-nho:nth-child(3) { width: 16px; height: 16px;}
-.sao-nho:nth-child(4) { width: 12px; height: 12px;}
-/* PHẦN CHÍNH */
-.phan-chinh {
-    margin-top: 36px;
-    padding: 0 56px;
-}
-.tieu-de-chinh {
-    font-size: 2rem;
-    color: #0e7490;
-    font-weight: 700;
-    text-align: center;
-    margin-bottom: 34px;
-    letter-spacing: 1px;
-}
-.danh-sach-chuc-nang {
-    display: flex;
-    flex-direction: row;
-    gap: 32px;
-    justify-content: center;
-    margin-top: 0;
-    flex-wrap: nowrap;
-}
-.the-chuc-nang {
-    flex: 1 1 0;
-    max-width: 290px;
-    background: #f9fafb;
-    border-radius: 30px;
-    box-shadow: 0 8px 32px 0 rgba(0,0,0,0.14);
-    padding: 40px 18px 28px 18px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 230px;
-    position: relative;
-    margin-bottom: 0;
-    transition: transform 0.18s, box-shadow 0.18s;
-}
-.the-chuc-nang:hover {
-    transform: translateY(-8px) scale(1.04);
-    box-shadow: 0 12px 42px 0 rgba(0,0,0,0.19);
-}
-.boc-icon {
-    position: relative;
-    margin-bottom: 17px;
-}
-.boc-icon .hinh-tron {
-    position: absolute;
-    left: 50%;
-    top: -20px;
-    transform: translateX(-50%);
-    width: 28px;
-    height: 28px;
-    background: #fff;
-    border-radius: 50%;
-    border: 4px solid #e0e7ff;
-    z-index: 2;
-    box-shadow: 0 2px 8px 0 rgba(0,0,0,0.10);
-}
-.the-chuc-nang img {
-    width: 68px;
-    height: 68px;
-    z-index: 3;
-    position: relative;
-    margin-top: 8px;
-    border-radius: 50%;
-    background: #fff;
-    padding: 7px;
-}
-.the-chuc-nang h3 {
-    font-size: 1.23rem;
-    font-weight: 700;
-    margin-bottom: 12px;
-    color: #191c32;
-    letter-spacing: 0.5px;
-    text-align: center;
-}
-.the-chuc-nang p {
-    font-size: 1.03rem;
-    color: #475569;
-    margin: 0 0 24px 0;
-    text-align: center;
-    min-height: 44px;
-    line-height: 1.45;
-}
-.nut-card {
-    border: none;
-    border-radius: 18px;
-    padding: 10px 0;
-    font-size: 1.08rem;
-    font-weight: 700;
-    color: #fff;
-    width: 100%;
-    margin-top: auto;
-    box-shadow: 0 2px 10px 0 rgba(0,0,0,0.07);
-    cursor: pointer;
-    transition: background 0.18s;
-}
-.loai1 .nut-card { background: #14b8a6; }
-.loai1 .nut-card:hover { background: #0891b2; }
-.loai2 .nut-card { background: #f97316; }
-.loai2 .nut-card:hover { background: #ea580c; }
-.loai3 .nut-card { background: #facc15; color: #a16207; }
-.loai3 .nut-card:hover { background: #fde047; color: #854d0e; }
-.loai4 .nut-card { background: #a78bfa; }
-.loai4 .nut-card:hover { background: #7c3aed; }
 
-@media (max-width: 1200px) {
-    .khung-chinh { max-width: 1000px; }
-    .phan-dau, .phan-chinh, .noi-dung-banner { padding-left: 18px; padding-right: 18px; }
-    .danh-sach-chuc-nang { gap: 18px; }
-    .the-chuc-nang { max-width: 235px; min-width: 180px; }
-    .banner-anh { min-width: 180px; }
+/* style.css */
+
+/* 1. Base Styles */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f3f4f6;
+    scroll-behavior: smooth;
 }
-@media (max-width: 900px) {
-    .danh-sach-chuc-nang { flex-wrap: wrap; }
-    .the-chuc-nang { max-width: 350px; min-width: 220px; margin-bottom: 22px; }
-    .banner { flex-direction: column; }
-    .banner-anh { display: none; }
+
+/* 2. Hiệu ứng Background Hero */
+.hero-bg {
+    background: linear-gradient(135deg, rgba(198, 40, 40, 0.95), rgba(130, 20, 20, 0.9)), 
+                url('https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Flag_of_Vietnam.svg/2560px-Flag_of_Vietnam.svg.png');
+    background-size: cover;
+    background-position: center;
+    background-blend-mode: overlay;
 }
-@media (max-width: 680px) {
-    .phan-dau, .phan-chinh, .noi-dung-banner { padding-left: 8px; padding-right: 8px; }
-    .tieu-de-banner { font-size: 1.35rem; }
-    .tieu-de-chinh { font-size: 1.2rem; }
-    .danh-sach-chuc-nang { flex-direction: column; gap: 18px; }
-    .the-chuc-nang { max-width: none; min-width: 0; }
+
+/* 3. Card Animations - Hiệu ứng nổi */
+.glass-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.exam-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border-color: #c62828;
+}
+
+/* 4. Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f1f1; 
+}
+::-webkit-scrollbar-thumb {
+    background: #c62828; 
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #b71c1c; 
+}
+
+/* 5. Animation Utility Classes */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+    animation: fadeIn 0.8s ease-out forwards;
+}
+
+/* 6. Button Styles */
+.btn-primary {
+    background: linear-gradient(to right, #c62828, #b71c1c);
+    color: white;
+    transition: all 0.3s ease;
+}
+.btn-primary:hover {
+    background: linear-gradient(to right, #d32f2f, #c62828);
+    box-shadow: 0 4px 14px 0 rgba(198, 40, 40, 0.39);
 }
