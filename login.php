@@ -51,12 +51,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($password, $user['mat_khau'])) {
-            // Đăng nhập thành công -> Lưu session
+            // 1. Chống tấn công Session Fixation (Bảo mật nâng cao)
+            session_regenerate_id(true);
+
+            // 2. Lưu thông tin vào Session
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['user_name'] = $user['ho_va_ten'];
             
-            // Chuyển hướng về trang chủ
-            header("Location: index.php");
+            // QUAN TRỌNG: Lưu quyền hạn vào session để dùng ở các trang khác
+            // (Giả sử trong DB bảng nguoi_dung bạn đã có cột 'role')
+            $_SESSION['role'] = isset($user['role']) ? $user['role'] : 'user'; 
+            
+            // 3. Điều hướng dựa trên quyền hạn
+            if ($_SESSION['role'] === 'admin') {
+                header("Location: admin.php");
+            } else {
+                header("Location: index.php");
+            }
             exit;
         } else {
             $error = "Email hoặc mật khẩu không đúng!";
