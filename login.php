@@ -228,14 +228,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </button>
             </form>
         </div>
-        
-        <div class="bg-slate-50 p-6 text-center border-t border-slate-100">
-            <p class="text-xs text-slate-500 mb-4">Hoặc tiếp tục với</p>
-            <div class="flex justify-center gap-4">
-                <button class="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-blue-600 hover:bg-blue-50 transition"><i class="fa-brands fa-facebook-f"></i></button>
-                <button class="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-red-500 hover:bg-red-50 transition"><i class="fa-brands fa-google"></i></button>
-            </div>
-        </div>
     </div>
 
     <script>
