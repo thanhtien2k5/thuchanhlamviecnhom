@@ -104,16 +104,6 @@ document.querySelectorAll('.code-card').forEach(card => {
 
         sparkles.classList.add('active');
         setTimeout(() => sparkles.remove(), 1200);
-
-        // 3. Âm thanh "ding" (tùy chọn - cực chất)
-        const audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3');
-        audio.volume = 0.3;
-        audio.play().catch(() => {}); // không lỗi nếu chặn autoplay
-
-        // 4. Hiệu ứng rung toàn màn hình nhẹ (siêu TikTok)
-        document.body.style.animation = 'none';
-        document.body.offsetHeight; // reflow
-        document.body.style.animation = 'tinyShake 0.4s ease';
     });
 });
 
