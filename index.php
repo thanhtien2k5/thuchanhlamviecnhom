@@ -168,10 +168,7 @@
         </div>
     </div>
 </section>
-    <!-- MAIN CONTENT -->
-    <main class="container mx-auto px-4 py-20 space-y-32">
-
-        <!-- ÔN CHƯƠNG -->
+  <!-- ÔN CHƯƠNG -->
         <section id="chapter-section" class="fade-up">
             <?php
             try {
@@ -182,14 +179,6 @@
                 $dsChuong = [];
             }
             ?>
-
-            <div class="text-center mb-16 text-reveal">
-                <h2 class="font-serif text-4xl md:text-5xl font-bold text-brand-dark mb-4">
-                    Ôn Tập Lý Thuyết Theo Chương
-                </h2>
-                <p class="text-xl text-slate-600">Kiến thức nền tảng – bám sát giáo trình chuẩn</p>
-            </div>
-
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 stagger-group">
                 <?php 
                 $icons = ['fa-landmark', 'fa-flag', 'fa-users', 'fa-book-open', 'fa-pen-nib', 'fa-scale-balanced'];
@@ -221,7 +210,71 @@
                 </div>
             <?php endif; ?>
         </section>
+    <!-- MAIN CONTENT: NGÂN HÀNG CÂU HỎI ÔN TẬP -->
+<section class="my-24" id="bank-questions-section">
+            <div class="text-center mb-12">
+                <h2 class="font-serif text-3xl md:text-4xl font-bold text-slate-800 mb-4 border-l-4 border-green-600 pl-4 inline-block">
+                    <i class="fa-solid fa-database mr-3 text-green-600"></i> Ngân Hàng Câu Hỏi Ôn Tập
+                </h2>
+            </div>
 
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                <!-- Card 1: Luyện ngẫu nhiên -->
+                <div class="bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-green-100 flex flex-col h-full group">
+                    <div class="p-8 text-center flex flex-col flex-grow">
+                        <div class="w-24 h-24 mx-auto bg-green-50 text-green-600 rounded-full flex items-center justify-center mb-6 text-5xl group-hover:bg-green-600 group-hover:text-white transition">
+                            <i class="fa-solid fa-shuffle"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-slate-800 mb-4">Luyện Ngẫu Nhiên</h3>
+                        <p class="text-slate-600 mb-8 flex-grow">
+                            Hệ thống chọn ngẫu nhiên 40–50 câu từ toàn bộ ngân hàng để bạn luyện tập không giới hạn.
+                        </p>
+                        <a href="practice_questions.php?mode=random" class="mt-auto w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl shadow-lg transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-play"></i> Bắt đầu ngay
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Card 2: Theo chương/chủ đề -->
+                <div class="bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-blue-100 flex flex-col h-full group">
+                    <div class="p-8 text-center flex flex-col flex-grow">
+                        <div class="w-24 h-24 mx-auto bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-6 text-5xl group-hover:bg-blue-600 group-hover:text-white transition">
+                            <i class="fa-solid fa-list-ol"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-slate-800 mb-4">Theo Chương / Chủ Đề</h3>
+                        <p class="text-slate-600 mb-8 flex-grow">
+                            Chọn chương cụ thể (nếu database có phân loại) để ôn tập trọng tâm.
+                        </p>
+                        <a href="practice_questions.php?mode=by_chapter" class="mt-auto w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-search"></i> Chọn chương
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Card 3: Xem toàn bộ ngân hàng -->
+                <div class="bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-orange-100 flex flex-col h-full group relative overflow-hidden">
+                    <div class="absolute top-4 right-4 bg-orange-100 text-orange-700 text-xs font-bold px-3 py-1 rounded-full animate-pulse">
+                        MỚI
+                    </div>
+                    <div class="p-8 text-center flex flex-col flex-grow">
+                        <div class="w-24 h-24 mx-auto bg-orange-50 text-orange-600 rounded-full flex items-center justify-center mb-6 text-5xl group-hover:bg-orange-600 group-hover:text-white transition">
+                            <i class="fa-solid fa-book-open-reader"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-slate-800 mb-4">Xem Toàn Bộ Câu Hỏi</h3>
+                        <p class="text-slate-600 mb-8 flex-grow">
+                            Duyệt, tìm kiếm và xem đáp án + giải thích chi tiết cho mọi câu hỏi.
+                        </p>
+                        <a href="practice_questions.php?mode=all" class="mt-auto w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold rounded-2xl shadow-lg transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-eye"></i> Mở ngân hàng
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    <!-- MAIN CONTENT -->
+    <main class="container mx-auto px-4 py-20 space-y-32">
+
+      
         <!-- LUYỆN ĐỀ + THỐNG KÊ -->
         <section id="exam-section" class="grid lg:grid-cols-2 gap-16 items-center">
             <div class="space-y-12 fade-up slide-left">
