@@ -1,19 +1,9 @@
 <?php
 require_once 'db.php';
-
-
-error_reporting(0);
-ini_set('display_errors', 0);
-
-session_start(); 
+session_start();
 
 
 if (!isset($_SESSION['user_id'])) {
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['status' => 'error', 'message' => 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!']);
-        exit;
-    }
     header("Location: login.php");
     exit;
 }
@@ -21,362 +11,213 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $exam_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-if ($exam_id == 0 && $_SERVER['REQUEST_METHOD'] !== 'POST') {
-    die("Không tìm thấy mã đề thi.");
-}
+// Lấy thông tin đề
+$stmt = $conn->prepare("SELECT * FROM bai_thi WHERE id = :id");
+$stmt->execute([':id' => $exam_id]);
+$exam = $stmt->fetch(PDO::FETCH_ASSOC);
 
+if (!$exam) die("Đề thi không tồn tại.");
 
+// KIỂM TRA LOẠI ĐỀ: Có phải thi thử không?
+$isExamMode = ($exam['loai_de'] == 'thi_thu'); 
+$timeLimit = isset($exam['thoi_gian']) ? (int)$exam['thoi_gian'] : 45; // Mặc định 45 phút
+
+// Xử lý nộp bài
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    header('Content-Type: application/json; charset=utf-8');
+    $answers = isset($_POST['answer']) ? $_POST['answer'] : []; 
+    
+    $stmtKey = $conn->prepare("SELECT ch.id, ch.dapAn FROM cau_hoi ch 
+                               JOIN bai_thi_cau_hoi btch ON ch.id = btch.cau_hoi_id 
+                               WHERE btch.bai_thi_id = :eid");
+    $stmtKey->execute([':eid' => $exam_id]);
+    $correctKeys = $stmtKey->fetchAll(PDO::FETCH_KEY_PAIR); 
+
+    $total = count($correctKeys);
+    $correctCount = 0;
+    
+    $conn->beginTransaction();
     try {
-        $input = json_decode(file_get_contents('php://input'), true);
-        if (!$input) throw new Exception("Không có dữ liệu gửi lên.");
-
-        
-        $userAnswers = $input['answers']; 
-
-        $conn->beginTransaction();
-
-        
-        
-        $sqlKey = "SELECT ch.id, ch.dapAn 
-                   FROM cau_hoi ch
-                   JOIN bai_thi_cau_hoi btch ON ch.id = btch.cau_hoi_id
-                   WHERE btch.bai_thi_id = :eid";
-        $stmtKey = $conn->prepare($sqlKey);
-        $stmtKey->execute([':eid' => $exam_id]);
-        $correctAnswersMap = $stmtKey->fetchAll(PDO::FETCH_KEY_PAIR); 
-
-        if (empty($correctAnswersMap)) throw new Exception("Đề thi không tồn tại hoặc không có câu hỏi.");
-
-        
-        $stmtName = $conn->prepare("SELECT tieu_de FROM bai_thi WHERE id = :id");
-        $stmtName->execute([':id' => $exam_id]);
-        $examTitle = $stmtName->fetchColumn();
-
-        
-        $totalQuestions = count($correctAnswersMap);
-        $correctCount = 0;
-        $detailsToSave = [];
-
-        
-        foreach ($userAnswers as $ans) {
-            $qid = $ans['question_id'];
-            $selected = $ans['selected'];
-            
-            
-            $isCorrect = 0;
-
-           
-            if (isset($correctAnswersMap[$qid]) && $correctAnswersMap[$qid] === $selected) {
-                $isCorrect = 1;
-                $correctCount++;
-            }
-
-            
-            $detailsToSave[] = [
-                'qid' => $qid,
-                'selected' => $selected,
-                'is_correct' => $isCorrect
-            ];
+        $details = [];
+        foreach ($correctKeys as $qid => $rightAns) {
+            $userAns = isset($answers[$qid]) ? $answers[$qid] : null;
+            $isRight = ($userAns === $rightAns) ? 1 : 0;
+            if ($isRight) $correctCount++;
+            $details[] = ['qid' => $qid, 'ans' => $userAns, 'is_right' => $isRight];
         }
 
-        
-        $finalScore = ($totalQuestions > 0) ? ($correctCount / $totalQuestions) * 10 : 0;
-        $finalScore = round($finalScore, 2); 
+        $score = ($total > 0) ? round(($correctCount / $total) * 10, 2) : 0;
 
-        
-        $sqlHistory = "INSERT INTO lich_su_lam_bai (nguoi_dung_id, bai_thi_id, ten_bai_thi, diem_so, thoi_gian_bat_dau, thoi_gian_ket_thuc) 
-                       VALUES (:uid, :eid, :title, :score, NOW(), NOW())";
-        $stmtHis = $conn->prepare($sqlHistory);
-        $stmtHis->execute([
-            ':uid' => $user_id,
-            ':eid' => $exam_id,
-            ':title' => $examTitle,
-            ':score' => $finalScore
-        ]);
+        $stmtH = $conn->prepare("INSERT INTO lich_su_lam_bai (nguoi_dung_id, bai_thi_id, ten_bai_thi, diem_so, thoi_gian_bat_dau, thoi_gian_ket_thuc) VALUES (?, ?, ?, ?, NOW(), NOW())");
+        $stmtH->execute([$user_id, $exam_id, $exam['tieu_de'], $score]);
         $history_id = $conn->lastInsertId();
 
-        
-        $sqlDetail = "INSERT INTO chi_tiet_bai_lam (lich_su_id, cau_hoi_id, cau_tra_loi, dung_sai) 
-                      VALUES (:ls_id, :qh_id, :ans, :is_correct)";
-        $stmtDet = $conn->prepare($sqlDetail);
-
-        foreach ($detailsToSave as $d) {
-            $stmtDet->execute([
-                ':ls_id' => $history_id,
-                ':qh_id' => $d['qid'],
-                ':ans'   => $d['selected'], 
-                ':is_correct' => $d['is_correct']
-            ]);
+        $stmtD = $conn->prepare("INSERT INTO chi_tiet_bai_lam (lich_su_id, cau_hoi_id, cau_tra_loi, dung_sai) VALUES (?, ?, ?, ?)");
+        foreach ($details as $d) {
+            $stmtD->execute([$history_id, $d['qid'], $d['ans'], $d['is_right']]);
         }
 
         $conn->commit();
-        echo json_encode(['status' => 'success', 'result_id' => $history_id]);
+        header("Location: result.php?id=$history_id");
         exit;
 
     } catch (Exception $e) {
-        if ($conn->inTransaction()) $conn->rollBack();
-        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-        exit;
+        $conn->rollBack();
+        die("Lỗi hệ thống: " . $e->getMessage());
     }
 }
 
-
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-
-
-$stmtExam = $conn->prepare("SELECT * FROM bai_thi WHERE id = :id");
-$stmtExam->execute([':id' => $exam_id]);
-$examInfo = $stmtExam->fetch(PDO::FETCH_ASSOC);
-
-if (!$examInfo) {
-    die("Đề thi không tồn tại hoặc đã bị xóa!");
-}
-
-
-$sqlQ = "SELECT DISTINCT ch.* FROM cau_hoi ch
+// Lấy danh sách câu hỏi
+$stmtQ = $conn->prepare("SELECT ch.* FROM cau_hoi ch
          JOIN bai_thi_cau_hoi btch ON ch.id = btch.cau_hoi_id
          WHERE btch.bai_thi_id = :eid
-         ORDER BY btch.thu_tu ASC, btch.cau_hoi_id ASC"; 
-         
-$stmtQ = $conn->prepare($sqlQ);
+         ORDER BY btch.thu_tu ASC, btch.cau_hoi_id ASC");
 $stmtQ->execute([':eid' => $exam_id]);
-$rawQuestions = $stmtQ->fetchAll(PDO::FETCH_ASSOC);
-
-if (count($rawQuestions) == 0) {
-    die('<div class="text-center p-10">Đề thi này chưa được cập nhật câu hỏi. Vui lòng liên hệ Admin. <a href="index.php" class="text-blue-500">Quay lại</a></div>');
-}
-
-
-$formattedQuestions = [];
-foreach ($rawQuestions as $row) {
-    $options = [
-        ['code' => 'A', 'content' => $row['cauA']],
-        ['code' => 'B', 'content' => $row['cauB']],
-        ['code' => 'C', 'content' => $row['cauC']],
-        ['code' => 'D', 'content' => $row['cauD']]
-    ];
-    
-    $formattedQuestions[] = [
-        'id' => $row['id'],
-        'content' => $row['cauHoi'],
-        
-        'options' => $options
-    ];
-}
-
-$jsonData = json_encode(['info' => $examInfo, 'questions' => $formattedQuestions]);
+$questions = $stmtQ->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($examInfo['tieu_de']); ?></title>
-    <link rel="stylesheet" href="style.css">
+    <title><?php echo htmlspecialchars($exam['tieu_de']); ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
     <style>
-       
-        .option-card:hover { background-color: #f3f4f6; } 
-        .option-selected { background-color: #fef2f2; border-color: #dc2626; position: relative; } 
-        
-        
-        .option-selected::after { content: '\f00c'; font-family: 'Font Awesome 6 Free'; font-weight: 900; position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: #dc2626; }
-        
-       
-        .q-grid-item.active { background: #334155; color: white; border-color: #334155; }
-        .q-grid-item.answered { background: #dc2626; color: white; border-color: #dc2626; }
+        input[type="radio"]:checked + label {
+            background-color: #fef2f2;
+            border-color: #dc2626;
+            color: #991b1b;
+        }
+        input[type="radio"]:checked + label .check-icon { display: block; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 h-screen flex flex-col overflow-hidden">
-    
-    <header class="bg-white border-b border-gray-200 h-16 flex-none z-50">
-        <div class="container mx-auto px-4 h-full flex justify-between items-center">
-            <a href="javascript:history.back()" class="text-gray-500 hover:text-red-600 mr-4">
-                <i class="fa-solid fa-arrow-left"></i>
-            </a>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
-            <h1 class="font-bold text-lg text-red-700 truncate max-w-xs flex-grow">
-                <?php echo htmlspecialchars($examInfo['tieu_de']); ?>
-            </h1>
-            
-            <div class="px-4 py-1 rounded-full flex items-center gap-2 border border-gray-300 mr-4 bg-white">
-                <i class="fa-regular fa-clock text-red-600"></i>
-                <span id="timer" class="font-bold text-xl text-gray-800">--:--</span>
-            </div>
-            
-            <button onclick="submitExam()" class="bg-red-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-red-700 text-sm">Nộp bài</button>
-        </div>
-    </header>
-
-    <main class="flex-grow container mx-auto px-4 py-6 flex gap-6 overflow-hidden h-[calc(100vh-64px)]">
-        <div class="w-full lg:w-3/4 flex flex-col h-full gap-4">
-            
-            <div class="w-full bg-gray-200 rounded-full h-1.5 flex-none">
-                <div id="progress-bar" class="bg-yellow-500 h-1.5 rounded-full" style="width: 0%"></div>
-            </div>
-            
-            <div class="bg-white rounded-2xl p-8 flex-grow overflow-y-auto border border-gray-200 relative">
-                <div id="question-container"></div>
-            </div>
-            
-            <div class="flex justify-between items-center flex-none py-2">
-                <button onclick="changeQuestion(-1)" id="btn-prev" class="px-6 py-3 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 font-semibold text-gray-600">Trước</button>
-                <button onclick="changeQuestion(1)" id="btn-next" class="px-8 py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700">Sau</button>
-            </div>
-        </div>
+    <form id="examForm" action="" method="POST" class="flex flex-col h-full">
         
-        <div class="hidden lg:flex w-1/4 flex-col h-full">
-            <div class="bg-white rounded-2xl border border-gray-200 p-5 h-full flex flex-col">
-                <h3 class="font-bold text-gray-700 mb-4">Danh sách câu hỏi</h3>
-                <div class="flex-grow overflow-y-auto pr-2 custom-scrollbar">
-                    <div id="question-grid" class="grid grid-cols-5 gap-2"></div>
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm h-16 flex-none">
+            <div class="container mx-auto px-4 h-full flex items-center justify-between">
+                <a href="list_exams.php?type=<?php echo $exam['loai_de']; ?>" class="text-slate-500 hover:text-red-600 font-medium">
+                    <i class="fa-solid fa-arrow-left mr-1"></i> Thoát
+                </a>
+                
+                <h1 class="font-bold text-lg text-slate-800 truncate px-4 flex-grow text-center lg:text-left">
+                    <?php echo htmlspecialchars($exam['tieu_de']); ?>
+                </h1>
+
+                <div class="flex items-center gap-3">
+                    
+                    <?php if ($isExamMode): ?>
+                        <div class="bg-slate-100 px-4 py-1 rounded-full border border-slate-300 flex items-center gap-2 text-red-600 font-bold min-w-[100px] justify-center">
+                            <i class="fa-regular fa-clock"></i>
+                            <span id="countdown">--:--</span>
+                        </div>
+                    <?php endif; ?>
+
+                    <button type="submit" onclick="return confirm('Bạn chắc chắn muốn nộp bài?')" class="bg-red-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-red-700 transition shadow-md text-sm">
+                        Nộp bài
+                    </button>
                 </div>
             </div>
-        </div>
-    </main>
+        </header>
 
-    <script>
-        const fullData = <?php echo $jsonData; ?>;
-        const quizData = fullData.questions;
-        const examInfo = fullData.info;
-
-        let currentQuestionIndex = 0;
-        let userAnswers = new Array(quizData.length).fill(null);
-        let timeLeft = (examInfo.thoi_gian || 45) * 60; 
-        let timerInterval;
-
-        document.addEventListener('DOMContentLoaded', () => {
-            if(quizData.length === 0) {
-                alert('Đề thi này chưa có câu hỏi nào!');
-                return;
-            }
-            renderGrid();
-            loadQuestion(0);
-            startTimer();
-        });
-
-        function renderGrid() {
-            const grid = document.getElementById('question-grid');
-            grid.innerHTML = '';
-            quizData.forEach((_, i) => {
-                const item = document.createElement('div');
-               
-                item.className = `q-grid-item flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 text-sm font-semibold cursor-pointer hover:bg-gray-100 ${i===0?'active':''}`;
-                item.innerText = i + 1;
-                item.onclick = () => loadQuestion(i);
-                item.id = `grid-item-${i}`;
-                grid.appendChild(item);
-            });
-        }
-
-        function loadQuestion(index) {
-            currentQuestionIndex = index;
-            const q = quizData[index];
-            const container = document.getElementById('question-container');
+        <main class="container mx-auto px-4 py-8 flex-grow flex gap-6 items-start relative">
             
-            document.querySelectorAll('.q-grid-item').forEach(e => e.classList.remove('active'));
-            document.getElementById(`grid-item-${index}`).classList.add('active');
+            <div class="w-full lg:w-3/4">
+                <?php if (empty($questions)): ?>
+                    <div class="text-center py-10 text-slate-500">Đề thi này chưa có câu hỏi nào.</div>
+                <?php endif; ?>
 
-           
-            let html = `
-                <div class="mb-6">
-                    <span class="text-red-700 font-bold text-sm bg-red-50 px-3 py-1 rounded-full mb-3 inline-block">Câu ${index + 1}</span>
-                    <h3 class="text-xl font-bold text-gray-800 leading-snug">${q.content}</h3>
-                </div>
-                <div class="space-y-3">
-            `;
+                <?php foreach ($questions as $index => $q): ?>
+                    <div id="cau-<?php echo $index + 1; ?>" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 scroll-mt-24">
+                        <div class="flex gap-4 mb-4">
+                            <span class="flex-none h-8 px-3 rounded-full bg-red-100 text-red-700 font-bold text-sm flex items-center justify-center">
+                                Câu <?php echo $index + 1; ?>
+                            </span>
+                            <h3 class="text-lg font-medium text-slate-800 pt-1 leading-snug">
+                                <?php echo $q['cauHoi']; ?>
+                            </h3>
+                        </div>
 
-            q.options.forEach(opt => {
-                const isSelected = userAnswers[index] === opt.code ? 'option-selected' : '';
-                
-                html += `
-                    <div onclick="selectAnswer(${index}, '${opt.code}')" 
-                         class="option-card p-4 rounded-xl border border-gray-200 flex items-center gap-4 bg-white cursor-pointer ${isSelected}">
-                        <div class="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center flex-none text-sm font-bold text-gray-500">${opt.code}</div>
-                        <span class="text-gray-700 font-medium">${opt.content}</span>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 ml-0 md:ml-2">
+                            <?php $options = ['A' => $q['cauA'], 'B' => $q['cauB'], 'C' => $q['cauC'], 'D' => $q['cauD']]; ?>
+                            <?php foreach ($options as $key => $val): ?>
+                                <div class="relative group">
+                                    <input type="radio" 
+                                           name="answer[<?php echo $q['id']; ?>]" 
+                                           value="<?php echo $key; ?>" 
+                                           id="q<?php echo $q['id']; ?>-<?php echo $key; ?>" 
+                                           class="peer hidden">
+                                    
+                                    <label for="q<?php echo $q['id']; ?>-<?php echo $key; ?>" 
+                                           class="block w-full p-4 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 hover:border-slate-300 transition relative select-none">
+                                        <span class="font-bold mr-2 text-slate-500"><?php echo $key; ?>.</span> 
+                                        <span><?php echo $val; ?></span>
+                                        <i class="fa-solid fa-check absolute top-4 right-4 text-red-600 hidden check-icon"></i>
+                                    </label>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
-                `;
-            });
-            html += `</div>`;
-            container.innerHTML = html;
-            updateButtons();
-        }
+                <?php endforeach; ?>
+                
+                <div class="mt-8 mb-12 lg:hidden">
+                    <button type="submit" class="w-full bg-red-600 text-white text-lg px-6 py-4 rounded-xl font-bold hover:bg-red-700 transition shadow-lg">
+                        Nộp bài ngay
+                    </button>
+                </div>
+            </div>
 
-        function selectAnswer(index, code) {
-            userAnswers[index] = code;
-            document.getElementById(`grid-item-${index}`).classList.add('answered');
-            loadQuestion(index);
-            updateProgressBar();
-        }
+            <div class="hidden lg:block w-1/4 sticky top-24">
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 max-h-[calc(100vh-120px)] flex flex-col">
+                    <div class="mb-4 pb-4 border-b border-slate-100">
+                        <h3 class="font-bold text-slate-700">Mục lục câu hỏi</h3>
+                    </div>
+                    
+                    <div class="overflow-y-auto custom-scrollbar flex-grow pr-1">
+                        <div class="grid grid-cols-5 gap-2">
+                            <?php foreach ($questions as $i => $q): ?>
+                                <a href="#cau-<?php echo $i + 1; ?>" 
+                                   class="flex items-center justify-center w-full aspect-square rounded bg-slate-100 hover:bg-red-600 hover:text-white text-slate-600 text-sm font-bold transition duration-200">
+                                    <?php echo $i + 1; ?>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        function updateButtons() {
-            document.getElementById('btn-prev').disabled = currentQuestionIndex === 0;
-            const nextBtn = document.getElementById('btn-next');
-            if (currentQuestionIndex === quizData.length - 1) {
-                nextBtn.innerText = 'Nộp bài';
-                nextBtn.onclick = submitExam;
-                nextBtn.classList.replace('bg-red-600', 'bg-green-600');
-            } else {
-                nextBtn.innerText = 'Sau';
-                nextBtn.onclick = () => changeQuestion(1);
-                nextBtn.classList.remove('bg-green-600');
-                nextBtn.classList.add('bg-red-600');
-            }
-        }
+        </main>
+    </form>
 
-        function changeQuestion(dir) {
-            const newIndex = currentQuestionIndex + dir;
-            if (newIndex >= 0 && newIndex < quizData.length) loadQuestion(newIndex);
-        }
-
-        function updateProgressBar() {
-            const count = userAnswers.filter(a => a).length;
-            document.getElementById('progress-bar').style.width = `${(count/quizData.length)*100}%`;
-        }
-
-        function startTimer() {
-            const el = document.getElementById('timer');
-            timerInterval = setInterval(() => {
-                if(timeLeft <= 0) { clearInterval(timerInterval); submitExam(); return; }
-                timeLeft--;
-                const m = Math.floor(timeLeft/60).toString().padStart(2,'0');
-                const s = (timeLeft%60).toString().padStart(2,'0');
-                el.innerText = `${m}:${s}`;
-            }, 1000);
-        }
-
-        function submitExam() {
-            clearInterval(timerInterval);
+    <?php if ($isExamMode): ?>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let duration = <?php echo $timeLimit * 60; ?>; 
+            const display = document.querySelector('#countdown');
             
-            const details = [];
-            quizData.forEach((q, i) => {
-                details.push({
-                    question_id: q.id,
-                    selected: userAnswers[i] 
-                });
-            });
+            const timer = setInterval(function () {
+                let minutes = parseInt(duration / 60, 10);
+                let seconds = parseInt(duration % 60, 10);
 
-            fetch('exam.php?id=<?php echo $exam_id; ?>', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ answers: details }) 
-            })
-            .then(res => res.json())
-            .then(data => {
-                if(data.status === 'success') {
-                    window.location.href = `result.php?id=${data.result_id}`;
-                } else {
-                    alert('Lỗi: ' + data.message);
+                minutes = minutes < 10 ? "0" + minutes : minutes;
+                seconds = seconds < 10 ? "0" + seconds : seconds;
+
+                display.textContent = minutes + ":" + seconds;
+
+                if (--duration < 0) {
+                    clearInterval(timer);
+                    alert("Đã hết thời gian làm bài! Hệ thống sẽ tự động nộp bài.");
+                    document.getElementById('examForm').submit();
                 }
-            })
-            .catch(err => alert('Lỗi kết nối server: ' + err));
-        }
+            }, 1000);
+        });
     </script>
+    <?php endif; ?>
+
 </body>
 </html>
