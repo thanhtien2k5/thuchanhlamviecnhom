@@ -2,6 +2,7 @@
 session_start();
 require_once 'db.php';
 
+// 1. CHECK QUYỀN ADMIN
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     header("Location: login.php");
     exit;
@@ -10,10 +11,12 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role
 $message = "";
 $msgType = "";
 
+// 2. XỬ LÝ FORM (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'];
 
     try {
+        // --- XỬ LÝ CHƯƠNG ---
         if ($action == 'save_chapter') {
             $ten = $_POST['ten_chuong'];
             $stt = (int)$_POST['so_thu_tu'];
@@ -21,10 +24,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = !empty($_POST['id']) ? (int)$_POST['id'] : 0;
 
             if ($id > 0) {
+                // Update
                 $stmt = $conn->prepare("UPDATE chuong SET ten_chuong=?, so_thu_tu=?, noi_dung=? WHERE id=?");
                 $stmt->execute([$ten, $stt, $noi_dung, $id]);
                 $message = "Đã cập nhật chương thành công!";
             } else {
+                // Insert
                 $stmt = $conn->prepare("INSERT INTO chuong (ten_chuong, so_thu_tu, noi_dung) VALUES (?, ?, ?)");
                 $stmt->execute([$ten, $stt, $noi_dung]);
                 $message = "Đã thêm chương mới thành công!";
@@ -33,12 +38,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         elseif ($action == 'delete_chapter') {
             $id = (int)$_POST['id'];
+            // Xóa bài học con trước (nếu không có cascade)
             $conn->exec("DELETE FROM bai_hoc WHERE chuong_id = $id");
+            // Xóa chương
             $conn->exec("DELETE FROM chuong WHERE id = $id");
             $message = "Đã xóa chương và các bài học liên quan!";
             $msgType = "success";
         }
 
+        // --- XỬ LÝ BÀI HỌC ---
         elseif ($action == 'save_lesson') {
             $cid = (int)$_POST['chuong_id'];
             $ten = $_POST['ten_bai'];
@@ -48,13 +56,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $lid = !empty($_POST['lesson_id']) ? (int)$_POST['lesson_id'] : 0;
 
             if ($lid > 0) {
-
+                // Update
                 $sql = "UPDATE bai_hoc SET chuong_id=?, ten_bai=?, thu_tu=?, video_url=?, noi_dung=? WHERE id=?";
                 $stmt = $conn->prepare($sql);
                 $stmt->execute([$cid, $ten, $stt, $video, $noi_dung, $lid]);
                 $message = "Đã cập nhật bài học thành công!";
             } else {
-       
+                // Insert
                 $sql = "INSERT INTO bai_hoc (chuong_id, ten_bai, thu_tu, video_url, noi_dung, created_at) VALUES (?, ?, ?, ?, ?, NOW())";
                 $stmt = $conn->prepare($sql);
                 $stmt->execute([$cid, $ten, $stt, $video, $noi_dung]);
@@ -65,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         elseif ($action == 'delete_lesson') {
             $id = (int)$_POST['id'];
             $conn->exec("DELETE FROM bai_hoc WHERE id = $id");
-$message = "Đã xóa bài học thành công!";
+            $message = "Đã xóa bài học thành công!";
             $msgType = "success";
         }
 
@@ -75,8 +83,11 @@ $message = "Đã xóa bài học thành công!";
     }
 }
 
+// 3. LẤY DỮ LIỆU ĐỂ HIỂN THỊ
+// Lấy danh sách chương
 $chapters = $conn->query("SELECT * FROM chuong ORDER BY so_thu_tu ASC")->fetchAll(PDO::FETCH_ASSOC);
 
+// Xử lý chế độ Sửa (Edit Mode)
 $editChapter = null;
 $editLesson = null;
 $view = isset($_GET['view']) ? $_GET['view'] : 'list'; // 'list', 'edit_chapter', 'edit_lesson'
@@ -91,6 +102,7 @@ if ($view == 'edit_lesson' && isset($_GET['id'])) {
     $stmt->execute([$_GET['id']]);
     $editLesson = $stmt->fetch(PDO::FETCH_ASSOC);
 }
+// Nếu bấm "Thêm bài học" cho 1 chương cụ thể
 $addLessonForChapter = isset($_GET['add_lesson_for']) ? (int)$_GET['add_lesson_for'] : 0;
 ?>
 
@@ -126,7 +138,7 @@ $addLessonForChapter = isset($_GET['add_lesson_for']) ? (int)$_GET['add_lesson_f
             </a>
         </nav>
         <div class="p-4 border-t border-slate-700">
-<a href="logout.php" class="flex items-center gap-2 text-red-400 hover:text-red-300 font-bold px-2">
+            <a href="logout.php" class="flex items-center gap-2 text-red-400 hover:text-red-300 font-bold px-2">
                 <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
             </a>
         </div>
@@ -172,7 +184,7 @@ $addLessonForChapter = isset($_GET['add_lesson_for']) ? (int)$_GET['add_lesson_f
                 </div>
 
             <?php elseif ($view == 'edit_lesson' || $addLessonForChapter > 0): ?>
-<div class="bg-white p-6 rounded-xl shadow-sm border border-green-200 mb-8">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-green-200 mb-8">
                     <h2 class="font-bold text-lg mb-4 text-green-600 border-b pb-2">
                         <?php echo $editLesson ? "✏️ Sửa Bài Học" : "➕ Thêm Bài Học Mới"; ?>
                     </h2>
@@ -209,7 +221,7 @@ $addLessonForChapter = isset($_GET['add_lesson_for']) ? (int)$_GET['add_lesson_f
                             <label class="block text-sm font-bold mb-1">Nội dung bài học (HTML)</label>
                             <textarea name="noi_dung" rows="5" class="w-full border p-2 rounded font-mono text-sm"><?php echo $editLesson['noi_dung'] ?? ''; ?></textarea>
                         </div>
-<button type="submit" class="bg-green-600 text-white px-6 py-2 rounded font-bold hover:bg-green-700">Lưu Bài Học</button>
+                        <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded font-bold hover:bg-green-700">Lưu Bài Học</button>
                         <a href="admin_chapters.php" class="ml-2 text-gray-500 hover:underline">Hủy</a>
                     </form>
                 </div>
@@ -249,7 +261,8 @@ $addLessonForChapter = isset($_GET['add_lesson_for']) ? (int)$_GET['add_lesson_f
                                 $stmtL->execute([$ch['id']]);
                                 $lessons = $stmtL->fetchAll(PDO::FETCH_ASSOC);
                             ?>
-<?php if(count($lessons) > 0): ?>
+                            
+                            <?php if(count($lessons) > 0): ?>
                                 <table class="w-full text-sm text-left">
                                     <thead class="text-xs text-slate-500 uppercase bg-slate-50">
                                         <tr>
@@ -284,7 +297,7 @@ $addLessonForChapter = isset($_GET['add_lesson_for']) ? (int)$_GET['add_lesson_f
                             <?php endif; ?>
 
                             <div class="mt-4 pt-3 border-t border-slate-100">
-<a href="admin_chapters.php?add_lesson_for=<?php echo $ch['id']; ?>" class="text-sm font-bold text-green-600 hover:text-green-800 flex items-center gap-1 w-fit">
+                                <a href="admin_chapters.php?add_lesson_for=<?php echo $ch['id']; ?>" class="text-sm font-bold text-green-600 hover:text-green-800 flex items-center gap-1 w-fit">
                                     <i class="fa-solid fa-plus-circle"></i> Thêm bài học vào Chương <?php echo $ch['so_thu_tu']; ?>
                                 </a>
                             </div>
