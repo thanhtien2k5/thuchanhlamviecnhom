@@ -2,87 +2,91 @@
 session_start();
 require_once 'db.php';
 
-// 1. Kiểm tra đã đăng nhập chưa
+// 1. Kiểm tra quyền Admin
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
-// 2. Kiểm tra CÓ PHẢI ADMIN KHÔNG? (Cực kỳ quan trọng)
-// Nếu role không phải admin -> Đuổi về trang chủ ngay lập tức
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-    // Có thể báo lỗi hoặc chuyển hướng âm thầm
+if (($_SESSION['role'] ?? '') !== 'admin') {
     header("Location: index.php"); 
     exit;
 }
 
 $message = "";
-$msgType = ""; // 'success' hoặc 'error'
+$msgType = "";
 
-// --- 2. LOGIC TRỘN ĐỀ (TOOL CỦA BẠN ĐÂY) ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] == 'mix_chapter') {
-    $chapId = (int)$_POST['chapter_id'];
-    
+// Hàm hỗ trợ lấy ID câu hỏi ngẫu nhiên
+function getRandomQuestionIds($conn, $cid, $level) {
+    $stmt = $conn->prepare("SELECT id FROM cau_hoi WHERE chuong_id = :cid AND muc_do = :level ORDER BY RAND()");
+    $stmt->execute([':cid' => $cid, ':level' => $level]);
+    return $stmt->fetchAll(PDO::FETCH_COLUMN);
+}
+
+// 2. Xử lý Logic Form
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     try {
         $conn->beginTransaction();
 
-        // A. Lấy 6 ID đề thi của chương này
-        $stmt = $conn->prepare("SELECT id FROM bai_thi WHERE chuong_id = :cid ORDER BY id ASC LIMIT 6");
-        $stmt->execute([':cid' => $chapId]);
-        $examIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        // --- Logic: Làm mới đề theo Chương ---
+        if ($_POST['action'] == 'mix_chapter') {
+            $chapId = (int)$_POST['chapter_id'];
+            
+            // Lấy 6 đề thi của chương
+            $stmt = $conn->prepare("SELECT id FROM bai_thi WHERE chuong_id = :cid ORDER BY id ASC LIMIT 6");
+            $stmt->execute([':cid' => $chapId]);
+            $examIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-        if (count($examIds) < 6) {
-            throw new Exception("Chương $chapId chưa đủ 6 đề thi. Vui lòng tạo đề trong CSDL trước!");
-        }
+            if (count($examIds) < 6) throw new Exception("Chương $chapId chưa đủ 6 đề thi để trộn.");
 
-        // B. Xóa câu hỏi cũ
-        $idList = implode(',', $examIds);
-        $conn->exec("DELETE FROM bai_thi_cau_hoi WHERE bai_thi_id IN ($idList)");
+            // Xóa câu hỏi cũ
+            $conn->exec("DELETE FROM bai_thi_cau_hoi WHERE bai_thi_id IN (" . implode(',', $examIds) . ")");
 
-        // C. Lấy bể câu hỏi theo mức độ (Easy/Medium/Hard)
-        // Lưu ý: Cần cột 'muc_do' trong bảng cau_hoi. Nếu chưa có, SQL sẽ lỗi -> Bạn nhớ thêm cột hoặc sửa logic về RAND() thuần túy.
-        
-        // Hàm lấy ID ngẫu nhiên
-        function getQuestionIds($pdo, $cid, $level, $limit) {
-            // Nếu bảng của bạn chưa có cột muc_do, bỏ đoạn "AND muc_do =..." đi
-            $sql = "SELECT id FROM cau_hoi WHERE chuong_id = $cid AND muc_do = '$level' ORDER BY RAND()"; 
-            $stmt = $pdo->query($sql);
-            return $stmt->fetchAll(PDO::FETCH_COLUMN);
-        }
+            // Lấy kho câu hỏi
+            $poolDe = getRandomQuestionIds($conn, $chapId, 'de');
+            $poolTB = getRandomQuestionIds($conn, $chapId, 'trung_binh');
+            $poolKho = getRandomQuestionIds($conn, $chapId, 'kho');
 
-        // Lấy danh sách ID (giả sử bạn đã nhập muc_do là 'de', 'trung_binh', 'kho')
-        $poolDe = getQuestionIds($conn, $chapId, 'de', 1000); 
-        $poolTB = getQuestionIds($conn, $chapId, 'trung_binh', 1000);
-        $poolKho = getQuestionIds($conn, $chapId, 'kho', 1000);
+            $stmtInsert = $conn->prepare("INSERT INTO bai_thi_cau_hoi (bai_thi_id, cau_hoi_id, thu_tu) VALUES (:eid, :qid, 0)");
 
-        // D. Chia bài
-        foreach ($examIds as $eid) {
-            // Lấy 13 Dễ + 14 TB + 13 Khó (Cắt ra để không trùng)
-            $questions = array_merge(
-                array_splice($poolDe, 0, 13),
-                array_splice($poolTB, 0, 14),
-                array_splice($poolKho, 0, 13)
-            );
-
-            // Nếu hết câu hỏi trong kho thì báo lỗi hoặc chấp nhận đề thiếu
-            if (count($questions) < 10) { 
-                // throw new Exception("Kho câu hỏi chương $chapId không đủ để chia cho 6 đề!");
+            // Chia bài
+            foreach ($examIds as $eid) {
+                $questions = array_merge(
+                    array_splice($poolDe, 0, 13),
+                    array_splice($poolTB, 0, 14),
+                    array_splice($poolKho, 0, 13)
+                );
+                shuffle($questions);
+                foreach ($questions as $qid) $stmtInsert->execute([':eid' => $eid, ':qid' => $qid]);
             }
+            $message = "Đã làm mới thành công 6 đề thi của Chương $chapId!";
+            $msgType = "success";
 
-            shuffle($questions); // Trộn lần cuối
+        // --- Logic: Trộn đề thi thử ---
+        } elseif ($_POST['action'] == 'mix_mock_test') {
+            $mockExamIds = $conn->query("SELECT id FROM bai_thi WHERE loai_de = 'thi_thu'")->fetchAll(PDO::FETCH_COLUMN);
+            
+            if (empty($mockExamIds)) throw new Exception("Chưa có đề thi thử nào.");
 
-            // Insert
-            $sqlInsert = "INSERT INTO bai_thi_cau_hoi (bai_thi_id, cau_hoi_id, thu_tu) VALUES (:eid, :qid, 0)";
-            $stmtInsert = $conn->prepare($sqlInsert);
-            foreach ($questions as $qid) {
-                $stmtInsert->execute([':eid' => $eid, ':qid' => $qid]);
+            $conn->exec("DELETE FROM bai_thi_cau_hoi WHERE bai_thi_id IN (" . implode(',', $mockExamIds) . ")");
+
+            $structure = [1 => 7, 2 => 7, 3 => 7, 4 => 7, 5 => 6, 6 => 6];
+            $stmtInsert = $conn->prepare("INSERT INTO bai_thi_cau_hoi (bai_thi_id, cau_hoi_id, thu_tu) VALUES (:eid, :qid, 0)");
+
+            foreach ($mockExamIds as $eid) {
+                $examQuestions = [];
+                foreach ($structure as $chapId => $limit) {
+                    $ids = $conn->query("SELECT id FROM cau_hoi WHERE chuong_id = $chapId ORDER BY RAND() LIMIT $limit")->fetchAll(PDO::FETCH_COLUMN);
+                    $examQuestions = array_merge($examQuestions, $ids);
+                }
+                shuffle($examQuestions);
+                foreach ($examQuestions as $qid) $stmtInsert->execute([':eid' => $eid, ':qid' => $qid]);
             }
+            $message = "Đã trộn mới thành công " . count($mockExamIds) . " đề thi thử!";
+            $msgType = "success";
         }
 
         $conn->commit();
-        $message = "Đã làm mới thành công 6 đề thi của Chương $chapId!";
-        $msgType = "success";
-
     } catch (Exception $e) {
         if ($conn->inTransaction()) $conn->rollBack();
         $message = "Lỗi: " . $e->getMessage();
@@ -90,65 +94,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] == 'mix_mock_test') {
-    try {
-        $conn->beginTransaction();
-
-        // 1. Lấy danh sách ID của các đề thi thử
-        $stmt = $conn->query("SELECT id FROM bai_thi WHERE loai_de = 'thi_thu'");
-        $mockExamIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-        if (empty($mockExamIds)) throw new Exception("Chưa có đề thi thử nào. Hãy tạo vỏ đề trước!");
-
-        // 2. Xóa câu hỏi cũ
-        $idList = implode(',', $mockExamIds);
-        $conn->exec("DELETE FROM bai_thi_cau_hoi WHERE bai_thi_id IN ($idList)");
-
-        // 3. Cấu trúc đề: 40 câu = (4 chương đầu x 7 câu) + (2 chương cuối x 6 câu)
-        $structure = [
-            1 => 7, 2 => 7, 3 => 7, 4 => 7, // Chương 1-4: lấy 7 câu
-            5 => 6, 6 => 6                  // Chương 5-6: lấy 6 câu
-        ];
-
-        // 4. Duyệt qua từng đề thi thử để nạp câu hỏi
-        foreach ($mockExamIds as $eid) {
-            $examQuestions = [];
-
-            foreach ($structure as $chapId => $limit) {
-                // Lấy ngẫu nhiên n câu từ chương tương ứng
-                // (Dùng ORDER BY RAND() vì đề thi thử cần ngẫu nhiên mỗi lần)
-                $sql = "SELECT id FROM cau_hoi WHERE chuong_id = $chapId ORDER BY RAND() LIMIT $limit";
-                $stmtQ = $conn->query($sql);
-                $ids = $stmtQ->fetchAll(PDO::FETCH_COLUMN);
-                $examQuestions = array_merge($examQuestions, $ids);
-            }
-
-            shuffle($examQuestions); // Trộn đều các chương với nhau
-
-            // Insert vào DB
-            $sqlInsert = "INSERT INTO bai_thi_cau_hoi (bai_thi_id, cau_hoi_id, thu_tu) VALUES (:eid, :qid, 0)";
-            $stmtInsert = $conn->prepare($sqlInsert);
-            foreach ($examQuestions as $qid) {
-                $stmtInsert->execute([':eid' => $eid, ':qid' => $qid]);
-            }
-        }
-
-        $conn->commit();
-        $message = "Đã trộn mới thành công " . count($mockExamIds) . " đề thi thử!";
-        $msgType = "success";
-
-    } catch (Exception $e) {
-        if ($conn->inTransaction()) $conn->rollBack();
-        $message = "Lỗi: " . $e->getMessage();
-        $msgType = "error";
-    }
-}
-
-// --- 3. LẤY THỐNG KÊ ĐỂ HIỂN THỊ ---
-$stats = [];
-$stats['users'] = $conn->query("SELECT COUNT(*) FROM nguoi_dung")->fetchColumn();
-$stats['questions'] = $conn->query("SELECT COUNT(*) FROM cau_hoi")->fetchColumn();
-$stats['exams'] = $conn->query("SELECT COUNT(*) FROM bai_thi")->fetchColumn();
+// 3. Lấy thống kê
+$stats = [
+    'users' => $conn->query("SELECT COUNT(*) FROM nguoi_dung")->fetchColumn(),
+    'questions' => $conn->query("SELECT COUNT(*) FROM cau_hoi")->fetchColumn(),
+    'exams' => $conn->query("SELECT COUNT(*) FROM bai_thi")->fetchColumn()
+];
 ?>
 
 <!DOCTYPE html>
@@ -178,6 +129,14 @@ $stats['exams'] = $conn->query("SELECT COUNT(*) FROM bai_thi")->fetchColumn();
             }
         }
     </script>
+    <style>
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans h-screen flex overflow-hidden">
 
@@ -200,7 +159,7 @@ $stats['exams'] = $conn->query("SELECT COUNT(*) FROM bai_thi")->fetchColumn();
                 <i class="fa-solid fa-book-open w-6"></i> Quản lý Chương
             </a>
             <a href="admin_users.php" class="block px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
-            <i class="fa-solid fa-users w-6"></i> Quản lý Người dùng
+                <i class="fa-solid fa-users w-6"></i> Quản lý Người dùng
             </a>
             <a href="index.php" target="_blank" class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-brand-gold hover:bg-slate-800 rounded-xl transition mt-8">
                 <i class="fa-solid fa-arrow-up-right-from-square w-6"></i> Xem trang chủ
@@ -279,10 +238,7 @@ $stats['exams'] = $conn->query("SELECT COUNT(*) FROM bai_thi")->fetchColumn();
                         <i class="fa-solid fa-robot text-2xl text-brand-gold"></i>
                         <div class="text-sm text-slate-600">
                             <p class="font-bold text-slate-800 mb-1">Cách hoạt động:</p>
-                            Khi bấm nút "Làm mới", hệ thống sẽ:<br>
-                            1. Xóa toàn bộ câu hỏi cũ trong 6 đề thi của chương đó.<br>
-                            2. Lấy ngẫu nhiên 40 câu hỏi mới từ ngân hàng (đảm bảo tỷ lệ Dễ/TB/Khó).<br>
-                            3. Phân phối đều vào 6 đề thi mà không trùng lặp.
+                            Khi bấm "Làm mới", hệ thống sẽ xóa câu hỏi cũ, lấy ngẫu nhiên 40 câu mới từ ngân hàng (đảm bảo tỷ lệ Dễ/TB/Khó) và phân phối đều vào 6 đề thi.
                         </div>
                     </div>
 
@@ -308,6 +264,7 @@ $stats['exams'] = $conn->query("SELECT COUNT(*) FROM bai_thi")->fetchColumn();
                     </div>
                 </div>
             </div>
+
             <div class="mt-10">
                 <h2 class="font-serif text-xl font-bold text-slate-800 mb-4 border-l-4 border-blue-600 pl-3">
                     Quản Lý Đề Thi Thử (Tổng Hợp)
@@ -322,7 +279,6 @@ $stats['exams'] = $conn->query("SELECT COUNT(*) FROM bai_thi")->fetchColumn();
                         </div>
                         <p class="text-slate-600 text-sm max-w-xl">
                             Chức năng này sẽ lấy câu hỏi ngẫu nhiên từ <strong>tất cả 6 chương</strong> theo tỷ lệ chuẩn và phân phối vào các đề thi thử.
-                            Mỗi đề sẽ có cấu trúc khác nhau hoàn toàn.
                         </p>
                     </div>
                     
@@ -336,20 +292,10 @@ $stats['exams'] = $conn->query("SELECT COUNT(*) FROM bai_thi")->fetchColumn();
             </div>
 
             <div class="mt-10 pt-6 border-t border-slate-200 text-center text-slate-400 text-sm">
-                HCM Ideology Admin Panel &copy; 2024
+                HCM Ideology Admin Panel &copy; <?php echo date('Y'); ?>
             </div>
 
         </div>
     </main>
-
-    <style>
-        /* Custom scrollbar cho đẹp */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
 </body>
 </html>
