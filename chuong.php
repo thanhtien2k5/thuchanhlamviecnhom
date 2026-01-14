@@ -163,7 +163,7 @@ $username = isset($_SESSION['user_name']) ? $_SESSION['user_name'] : '';
             <a href="index.php" class="px-6 py-3 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 font-medium transition">
                 <i class="fa-solid fa-arrow-left mr-2"></i> Chọn chương khác
             </a>
-            <a href="list_exams.php?chuong_id=<?php echo $chuong_id; ?>" class="px-6 py-3 rounded-xl bg-brand-red text-white hover:bg-red-700 font-bold shadow-lg shadow-red-200 transition">
+            <a href="list_exams.php?type=theo_chuong&chuong_id=<?php echo $chuong_id; ?>" class="px-6 py-3 rounded-xl bg-brand-red text-white hover:bg-red-700 font-bold shadow-lg shadow-red-200 transition">
                 Luyện đề chương này <i class="fa-solid fa-arrow-right ml-2"></i>
             </a>
         </div>
